@@ -1,8 +1,12 @@
-package Bio::Stream;
+package Bio::Stream::CollectionI;
 
-use warnings;
-use strict;
-our $VERSION = '0.01';
+use base qw(Bio::Stream::GenericStreamI);
+
+sub add_stream { shift->throw_not_implemented }
+
+sub remove_stream { shift->throw_not_implemented }
+
+sub registered_streams { shift->throw_not_implemented }
 
 1;
 
@@ -10,15 +14,15 @@ __END__
 
 =head1 NAME
 
-Bio::Stream - <One-line description of module's purpose>
+Bio::Stream::CollectionI - <One-line description of module's purpose>
 
 =head1 VERSION
 
-This documentation refers to Bio::Stream version .
+This documentation refers to Bio::Stream::CollectionI version .
 
 =head1 SYNOPSIS
 
-   use Bio::Stream;
+   use Bio::Stream::CollectionI;
    # Brief but working code example(s) here showing the most common usage(s)
 
    # This section will be as far as many users bother reading,

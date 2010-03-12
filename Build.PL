@@ -8,7 +8,7 @@ my $builder = Module::Build->new(
     dist_author         => q{Chris Fields <cjfields@bioperl.org>},
     dist_version_from   => 'lib/Bio/Stream.pm',
     build_requires => {
-        'Test::More' => 0,
+        'Bio::Root::Version' => '1.006001',
     },
     add_to_cleanup      => [ 'Bio-Stream-*' ],
     create_makefile_pl => 'traditional',

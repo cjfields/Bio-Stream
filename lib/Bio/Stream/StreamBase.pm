@@ -1,8 +1,98 @@
-package Bio::Stream;
+package Bio::Stream::StreamBase;
 
-use warnings;
 use strict;
-our $VERSION = '0.01';
+use warnings;
+use base qw(Bio::Root::IO Bio::Stream::GenericStreamI);
+
+use Fcntl;
+
+sub new {
+    my ($caller, @args) = @_;
+    # this should only call Bio::Root::Root::new()
+    my $self = Bio::Root::Root::new($caller, @args);
+    
+    my $io = $self->_rearrange([qw[STREAM]], @args);
+    if ($io) {
+        $self->_init_from_stream($io)
+    } else {
+        $self->_initialize_io(@args);
+        $self->_set_markers(qw(start current));
+    }
+    
+    $self->noclose(1); 
+    return $self;
+}
+
+sub _init_from_stream {
+    my ($self, $io) = @_;
+    if ($io && ref $io) {
+        $self->throw("Must use a Bio::Stream::StreamBase")
+            unless $io->isa('Bio::Stream::StreamBase');
+        
+        # this is pretty naive ATM, should change to be more generic
+        my $fh = $io->_fh;
+        $self->_initialize_io(-fh => $io->_fh);
+        $self->_set_markers(qw(start current));
+        # carry over any buffers
+        $self->_buffer($io->_buffer) if $io->_buffer;
+        $self->parent_stream($io);
+    } else {
+        $self->throw("_init_from_io() requires a Bio::Root::IO");
+    }
+}
+
+sub _buffer {
+    my ($self, $buffer) = @_;
+    if ($buffer && ref $buffer eq 'ARRAY') {
+        @{$self->{_readbuffer}} = @$buffer;
+    }
+    return $self->{_readbuffer}
+}
+
+sub tell {
+    my ($self, $type) = @_;
+    return unless $type;
+    $self->{_pos}->{$type};
+}
+
+sub seek {
+    my ($self, $type) = @_;
+    return unless $type;
+    CORE::seek($self->_fh, $self->tell($type), 0);
+}
+
+sub _set_markers {
+    my ($self, @types) = @_;
+    return unless @types;
+    my $pos = CORE::tell($self->_fh);
+    for my $type (@types) {
+        next unless $type;
+        $self->{_pos}->{$type} = $pos;
+    }
+}
+
+sub _readline {
+    my $self = shift;
+    $self->seek('current') if CORE::tell($self->_fh) != $self->tell('current');
+    my $line = $self->SUPER::_readline(@_);
+    $self->_set_markers('current');
+    $line;
+}
+
+sub parent_stream {
+    my $self = shift;
+    return $self->{_parent_stream} = shift if @_;
+    return $self->{_parent_stream};
+}
+
+
+sub DESTROY {
+    my $self = shift;
+    # if in parent stream...
+    if (!defined ($self->parent_stream)) {
+        close $self->_fh unless $self->_fh->isa('IO::String');
+    }
+}
 
 1;
 
@@ -10,15 +100,15 @@ __END__
 
 =head1 NAME
 
-Bio::Stream - <One-line description of module's purpose>
+Bio::Stream::StreamBase - <One-line description of module's purpose>
 
 =head1 VERSION
 
-This documentation refers to Bio::Stream version .
+This documentation refers to Bio::Stream::GenericStreamI version .
 
 =head1 SYNOPSIS
 
-   use Bio::Stream;
+   use Bio::Stream::GenericStreamI;
    # Brief but working code example(s) here showing the most common usage(s)
 
    # This section will be as far as many users bother reading,

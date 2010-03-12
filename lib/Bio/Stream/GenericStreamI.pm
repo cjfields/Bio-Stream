@@ -1,8 +1,22 @@
-package Bio::Stream;
+package Bio::Stream::GenericStreamI;
 
-use warnings;
 use strict;
-our $VERSION = '0.01';
+use warnings;
+use base qw(Bio::Event::EventGeneratorI);
+
+sub _init_from_io { shift->throw_not_implemented; }
+
+sub next_dataset { shift->throw_not_implemented; }
+
+sub stream_status { shift->throw_not_implemented; }
+
+sub stream_start { shift->throw_not_implemented; }
+
+sub stream_pos { shift->throw_not_implemented; }
+
+sub advance { shift->throw_not_implemented; }
+
+sub auto_advance { shift->throw_not_implemented; }
 
 1;
 
@@ -10,15 +24,15 @@ __END__
 
 =head1 NAME
 
-Bio::Stream - <One-line description of module's purpose>
+Bio::Stream::GenericStreamI - <One-line description of module's purpose>
 
 =head1 VERSION
 
-This documentation refers to Bio::Stream version .
+This documentation refers to Bio::Stream::GenericStreamI version .
 
 =head1 SYNOPSIS
 
-   use Bio::Stream;
+   use Bio::Stream::GenericStreamI;
    # Brief but working code example(s) here showing the most common usage(s)
 
    # This section will be as far as many users bother reading,
