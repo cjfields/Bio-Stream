@@ -10,6 +10,8 @@ sub next_dataset { shift->throw_not_implemented; }
 
 sub stream_status { shift->throw_not_implemented; }
 
+sub stream_type { shift->throw_not_implemented; }
+
 sub stream_start { shift->throw_not_implemented; }
 
 sub stream_pos { shift->throw_not_implemented; }

@@ -1,10 +1,8 @@
-package Bio::Stream::StreamBase;
+package Bio::Stream::IO;
 
 use strict;
 use warnings;
 use base qw(Bio::Root::IO Bio::Stream::GenericStreamI);
-
-use Fcntl;
 
 sub new {
     my ($caller, @args) = @_;
@@ -26,8 +24,8 @@ sub new {
 sub _init_from_stream {
     my ($self, $io) = @_;
     if ($io && ref $io) {
-        $self->throw("Must use a Bio::Stream::StreamBase")
-            unless $io->isa('Bio::Stream::StreamBase');
+        $self->throw("Must use a Bio::Root::IO")
+            unless $io->isa('Bio::Root::IO');
         
         # this is pretty naive ATM, should change to be more generic
         my $fh = $io->_fh;
@@ -85,6 +83,10 @@ sub parent_stream {
     return $self->{_parent_stream};
 }
 
+sub spawn_stream {
+    my $self = shift;
+    return $self->new(-stream => $self);
+}
 
 sub DESTROY {
     my $self = shift;
@@ -100,7 +102,7 @@ __END__
 
 =head1 NAME
 
-Bio::Stream::StreamBase - <One-line description of module's purpose>
+Bio::Stream::IO - <One-line description of module's purpose>
 
 =head1 VERSION
 

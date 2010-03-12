@@ -1,5 +1,8 @@
 package Bio::Stream::CollectionI;
 
+use strict;
+use warnings;
+
 use base qw(Bio::Stream::GenericStreamI);
 
 sub add_stream { shift->throw_not_implemented }
