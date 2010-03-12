@@ -1,8 +1,19 @@
 Build.PL
 Changes
-MANIFEST
-README
+ignore.txt
+lib/Bio/Seq/Lazy.pm
+lib/Bio/SeqIO/gbstream.pm
 lib/Bio/Stream.pm
-t/00-load.t
+lib/Bio/Stream/Annotation.pm
+lib/Bio/Stream/CollectionI.pm
+lib/Bio/Stream/GenericStreamI.pm
+lib/Bio/Stream/IO.pm
+MANIFEST			This list of files
+MANIFEST.SKIP
+README
+t/boilerplate.t
+t/data/AnnIX-v003.gbk
+t/IO.t
+t/load_manifest.t
 t/pod-coverage.t
 t/pod.t
