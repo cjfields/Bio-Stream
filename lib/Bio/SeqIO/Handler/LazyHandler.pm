@@ -178,40 +178,40 @@ my %HANDLERS = (
         # handles anything else (WGS, WGS_SCAFLD, CONTIG, PROJECT)
         '_DEFAULT_'     => \&_generic_simplevalue, 
         },
-    'embl'      => {
-        'ID'            => \&_embl_id,
-        'DT'            => \&_embl_date,
-        'DR'            => \&_generic_dbsource,
-        'SV'            => \&_generic_version,
-        'RN'            => \&_generic_reference,
-        'KW'            => \&_generic_keywords,
-        'DE'            => \&_generic_description,
-        'AC'            => \&_generic_accession,
-        #'AH'            => \&noop, # TPA data not dealt with yet...
-        #'AS'            => \&noop,
-        'SQ'            => \&_generic_seq,
-        'OS'            => \&_generic_species,
-        'CC'            => \&_generic_comment,
-        'FT'            => \&_generic_seqfeatures,
-        # handles anything else (WGS, TPA, ANN...)
-        '_DEFAULT_'     => \&_generic_simplevalue, 
-        },
-    'swiss'     => {
-        'ID'            => \&_swiss_id,
-        'DT'            => \&_swiss_date,
-        'GN'            => \&_swiss_genename,
-        'DR'            => \&_generic_dbsource,
-        'RN'            => \&_generic_reference,
-        'KW'            => \&_generic_keywords,
-        'DE'            => \&_generic_description,
-        'AC'            => \&_generic_accession,
-        'SQ'            => \&_generic_seq,
-        'OS'            => \&_generic_species,
-        'CC'            => \&_generic_comment,
-        'FT'            => \&_generic_seqfeatures,
-        # handles anything else, though I don't know what...
-        '_DEFAULT_'     => \&_generic_simplevalue,  
-        },
+    #'embl'      => {
+    #    'ID'            => \&_embl_id,
+    #    'DT'            => \&_embl_date,
+    #    'DR'            => \&_generic_dbsource,
+    #    'SV'            => \&_generic_version,
+    #    'RN'            => \&_generic_reference,
+    #    'KW'            => \&_generic_keywords,
+    #    'DE'            => \&_generic_description,
+    #    'AC'            => \&_generic_accession,
+    #    #'AH'            => \&noop, # TPA data not dealt with yet...
+    #    #'AS'            => \&noop,
+    #    'SQ'            => \&_generic_seq,
+    #    'OS'            => \&_generic_species,
+    #    'CC'            => \&_generic_comment,
+    #    'FT'            => \&_generic_seqfeatures,
+    #    # handles anything else (WGS, TPA, ANN...)
+    #    '_DEFAULT_'     => \&_generic_simplevalue, 
+    #    },
+    #'swiss'     => {
+    #    'ID'            => \&_swiss_id,
+    #    'DT'            => \&_swiss_date,
+    #    'GN'            => \&_swiss_genename,
+    #    'DR'            => \&_generic_dbsource,
+    #    'RN'            => \&_generic_reference,
+    #    'KW'            => \&_generic_keywords,
+    #    'DE'            => \&_generic_description,
+    #    'AC'            => \&_generic_accession,
+    #    'SQ'            => \&_generic_seq,
+    #    'OS'            => \&_generic_species,
+    #    'CC'            => \&_generic_comment,
+    #    'FT'            => \&_generic_seqfeatures,
+    #    # handles anything else, though I don't know what...
+    #    '_DEFAULT_'     => \&_generic_simplevalue,  
+    #    },
     );
 
 # can we do this generically?  Seems like a lot of trouble...

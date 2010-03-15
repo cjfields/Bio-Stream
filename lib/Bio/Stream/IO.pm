@@ -69,9 +69,17 @@ sub _set_markers {
     }
 }
 
+sub _set_marker_pos {
+    my ($self, $type, $pos) = @_;
+    return unless $type && defined $pos;
+    $self->{_pos}->{$type} = $pos;
+}
+
 sub _readline {
     my $self = shift;
-    $self->seek('current') if CORE::tell($self->_fh) != $self->tell('current');
+    my ($current, $end) = ($self->tell('current'), $self->tell('end'));
+    return if defined $end && $current > $end; # end of the stream
+    $self->seek('current') if CORE::tell($self->_fh) != $current;
     my $line = $self->SUPER::_readline(@_);
     $self->_set_markers('current');
     $line;
@@ -84,8 +92,12 @@ sub parent_stream {
 }
 
 sub spawn_stream {
-    my $self = shift;
-    return $self->new(-stream => $self);
+    my ($self, %markers) = @_;
+    my $spawn = $self->new(-stream => $self);
+    if (%markers) {
+        $spawn->_set_marker_pos($_, $markers{$_}) for keys %markers;
+    }
+    $spawn;
 }
 
 sub DESTROY {

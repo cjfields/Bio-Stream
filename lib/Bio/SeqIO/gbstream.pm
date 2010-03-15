@@ -2,8 +2,9 @@ package Bio::SeqIO::gbstream;
 use strict;
 use warnings;
 use Data::Dumper;
-use Bio::SeqIO::Handler::GenericRichSeqHandler;
-use Bio::Seq::SeqFactory;
+use Bio::Seq::Lazy;
+#use Bio::SeqIO::Handler::GenericRichSeqHandler;
+#use Bio::Seq::SeqFactory;
 
 use base qw(Bio::Stream::IO Bio::SeqIO);
 
@@ -36,14 +37,15 @@ sub _initialize {
     my($self,@args) = @_;
 
     $self->SUPER::_initialize(@args);
-    my $handler = $self->_rearrange([qw(HANDLER)],@args);
+    
+    #my $handler = $self->_rearrange([qw(HANDLER)],@args);
     # hash for functions for decoding keys.
-    $handler ? $self->seqhandler($handler) :
-    $self->seqhandler(Bio::SeqIO::Handler::GenericRichSeqHandler->new(
-                    -format => 'genbank',
-                    -verbose => $self->verbose,
-                    -builder => $self->sequence_builder
-                    ));
+    #$handler ? $self->seqhandler($handler) :
+    #$self->seqhandler(Bio::SeqIO::Handler::LazyHandler->new(
+    #                -format => 'genbank',
+    #                -verbose => $self->verbose,
+    #                -builder => $self->sequence_builder
+    #                ));
     #if( ! defined $self->sequence_factory ) {
     #    $self->sequence_factory(Bio::Seq::SeqFactory->new
     #            (-verbose => $self->verbose(),
@@ -64,166 +66,73 @@ sub _initialize {
 # at this point there is minimal sequence validation,
 # but the parser seems to hold up nicely so far...
 
+my %STREAM_START = (
+    LOCUS       => 'annotation',
+    FEATURES    => 'features',
+    ORIGIN      => 'sequence',
+    '//'        => 'end'
+);
+
+my %STREAM_PARSER = (
+    'annotation'    => sub {
+        my $stream = shift;
+        my $data;
+        while (my $line = $stream->_readline) {
+            if ($line =~ /^(\s{0,3})(\w+)\s+(.*)$}/ox) {
+                
+            }
+        }
+    },
+);
+
+# these are the stream-specific subs that pull out data into discrete bits
+# and 
+
 sub next_seq {
     my $self = shift;
     local($/) = "\n";
-    my ($ann, $data, $annkey);
-    my $endrec = my $seenfeat = 0;
-    my $seqdata;
     my $seenlocus;
-    #my $hobj = $self->seqhandler;
-    #my $handlers = $self->seqhandler->handler_methods;
-    #$self->debug(Dumper($handlers));
     my $seq;
-    my $mode = 'annotation';
+    my $stream;
+    my $prior_stream;
     my $fh = $self->_fh;
     PARSER:
     while (defined(my $line = $self->_readline)) {
         next if $line =~ m{^\s*$};
-        $seq ||= 1;
-        last PARSER if (index($line,'//')==0);
-        if ($mode eq 'sequence') {
-            
-        }
-        elsif ($mode eq 'features') {
-            $mode = $ann eq 'ORIGIN' || $ann eq 'BASE' ?  'sequence'
-                    : $ann eq 'FEATURES' ? 'features' : 'annotation';
-        }
-        elsif ($line =~ m{^(\w+)\s+}ox) {
-            $ann = $1;
+        if ($line =~ m{^(LOCUS|FEATURES|ORIGIN|//)\s+}ox) {
+            my $ann = $1;
             unless ($seenlocus) {
                 $self->throw("No LOCUS found.  Not GenBank in my book!")
                     if ($ann ne 'LOCUS');
                 $seenlocus = 1;
             }
-            $mode = $ann eq 'ORIGIN' || $ann eq 'BASE' ?  'sequence'
-                    : $ann eq 'FEATURES' ? 'features' : 'annotation';
-        }
-        print "$mode: $line";
-        #    # use the spacer to determine the annotation type
-        #    my $len = length($1 || '');
-        #    
-        #    $annkey  = ($len == 0 || $len > 4)   ? 'DATA'  : $ann;
-        #    
-        #    # Push off the previously cached data to the handler
-        #    # whenever a new primary annotation or seqfeature is found
-        #    # Note use of $endrec for catching end of record
-        #    if (($annkey eq 'DATA') && $seqdata) {
-        #        chomp $seqdata->{DATA};
-        #        # postprocessing for some data
-        #        if ($seqdata->{NAME} eq 'FEATURES') {
-        #            $self->_process_features($seqdata)
-        #        }
-        #        
-        #        # using handlers directly, slightly faster
-        #        #my $method = (exists $handlers->{ $seqdata->{NAME} }) ?
-        #        #        ($handlers->{$seqdata->{NAME}}) :
-        #        #    (exists $handlers->{'_DEFAULT_'}) ?
-        #        #        ($handlers->{'_DEFAULT_'}) :
-        #        #    undef;
-        #        #($method) ? ($hobj->$method($seqdata) ) :
-        #        #        $self->debug("No handler defined for ",$seqdata->{NAME},"\n");
-        #
-        #        # using handler methods in the Handler object, more centralized
-        #        #$self->debug(Dumper($seqdata));
-        #        $hobj->data_handler($seqdata);
-        #
-        #        # bail here on //
-        #        last PARSER if $endrec;
-        #        # reset for next round
-        #        $seqdata = undef;
-        #    }
-        #
-        #    $seqdata->{NAME} =  ($len == 0) ? $ann :   # primary ann
-        #                        ($len > 4 ) ? 'FEATURES': # sf feature key
-        #                        $seqdata->{NAME};      # all rest are sec. ann
-        #    if ($seqdata->{NAME} eq 'FEATURES') {
-        #        $seqdata->{FEATURE_KEY} = $ann;
-        #    }
-        #    # throw back to top if seq is found to avoid regex
-        #    next PARSER if $ann eq 'ORIGIN';
-        #    
-        #} else {
-        #    ($data = $line) =~ s{^\s+}{};
-        #    chomp $data;
-        #}
-        #my $delim = ($seqdata && $seqdata->{NAME} eq 'FEATURES') ? "\n" : ' ';
-        #$seqdata->{$annkey} .= ($seqdata->{$annkey}) ? $delim.$data : $data;
-    }
-    return $seq;
-    #return $hobj->build_sequence;
-}
-
-sub next_chunk {
-    my $self = shift;
-    local($/) = "\n";
-    my ($ann, $data, $annkey);
-    my $endrec = my $seenfeat = 0;
-    my $seqdata;
-    my $seenlocus;
-    my $hobj = $self->seqhandler;
-    PARSER:
-    while (defined(my $line = $self->_readline)) {
-        next if $line =~ m{^\s*$};
-        # have to catch this at the top of the loop, then exit SEQ loop on //
-        # The reason? The regex match for ann/feat keys also matches some lines
-        # in the sequence; no easy way around it since some feature keys may
-        # start with a number as well
-        if ($ann && $ann eq 'ORIGIN') {
-            SEQ:
-            while (defined($line)) {
-                last SEQ if index($line,'//') == 0;
-                $seqdata->{DATA} .= uc $line;
-                $line = $self->_readline;
-            }
-            $seqdata->{DATA} =~ tr{0-9 \n}{}d;
-        }
-        $endrec = 1 if (index($line,'//')==0);
-
-        if ($line =~ m{^(\s{0,5})(\w+)\s+(.*)$}ox || $endrec) {
-            ($ann, $data) = ($2, $3);
-            unless ($seenlocus) {
-                $self->throw("No LOCUS found.  Not GenBank in my book!")
-                    if ($ann ne 'LOCUS');
-                $seenlocus = 1;
-            }
-            # use the spacer to determine the annotation type
-            my $len = length($1 || '');
-            
-            $annkey  = ($len == 0 || $len > 4)   ? 'DATA'  : $ann;
-            
-            # Push off the previously cached data to the handler
-            # whenever a new primary annotation or seqfeature is found
-            # Note use of $endrec for catching end of record
-            if (($annkey eq 'DATA') && $seqdata) {
-                chomp $seqdata->{DATA};
-                # postprocessing for some data
-                if ($seqdata->{NAME} eq 'FEATURES') {
-                    $self->_process_features($seqdata)
-                }
-                # using handler methods in the Handler object, more centralized
-                $hobj->data_handler($seqdata);
-                # bail here on //
-                last PARSER if $endrec;
-                # reset for next round
-                $seqdata = undef;
-            }
-
-            $seqdata->{NAME} =  ($len == 0) ? $ann :   # primary ann
-                                ($len > 4 ) ? 'FEATURES': # sf feature key
-                                $seqdata->{NAME};      # all rest are sec. ann
-            if ($seqdata->{NAME} eq 'FEATURES') {
-                $seqdata->{FEATURE_KEY} = $ann;
-            }
-            # throw back to top if seq is found to avoid regex
-            next PARSER if $ann eq 'ORIGIN';
+            $seq ||= Bio::Seq::Lazy->new();
+            $stream = $STREAM_START{$ann};
         } else {
-            ($data = $line) =~ s{^\s+}{};
-            chomp $data;
+            next;
         }
-        my $delim = ($seqdata && $seqdata->{NAME} eq 'FEATURES') ? "\n" : ' ';
-        $seqdata->{$annkey} .= ($seqdata->{$annkey}) ? $delim.$data : $data;
+        $self->throw("Stream type not defined") if !defined $stream;
+
+        #local $/ = $mode eq 'sequence' ? "\n//" : "\n";
+        
+        # if we get here, we start a new stream based on the mode
+        # trick here is, do we want to hand this off to the handler, or
+        # do within the sequence object?  For now just pass in the streams to
+        # the sequence object, work it out from there
+        if ($stream ne 'end') {
+            my $pos = tell($fh) - length($line);
+            $seq->stream($stream,
+                         $self->spawn_stream('start' => $pos,
+                                             'current' => $pos));
+            $seq->stream($prior_stream)->_set_marker_pos('end', $pos) if $prior_stream;
+        } else {
+            last PARSER;
+        }
+        $prior_stream = $stream;
     }
+    # fencepost
+    $seq->stream($prior_stream)->_set_marker_pos('end', tell($fh)) if $seq;
+    return $seq;
 }
 
 =head2 write_seq
@@ -241,70 +150,9 @@ sub write_seq {
     # maybe make a Writer class as well????
 }
 
-=head2 seqhandler
+package Bio::SeqIO::gbstream::annotation;
 
- Title   : seqhandler
- Usage   : $stream->seqhandler($handler)
- Function: Get/Set teh Bio::Seq::HandlerBaseI object
- Returns : Bio::Seq::HandlerBaseI 
- Args    : Bio::Seq::HandlerBaseI 
-
-=cut
-
-sub seqhandler {
-    my ($self, $handler) = @_;
-    if ($handler) {
-        $self->throw("Not a Bio::HandlerBaseI") unless
-        ref($handler) && $handler->isa("Bio::HandlerBaseI");
-        $self->{'_seqhandler'} = $handler;
-    }
-    return $self->{'_seqhandler'};
-}
-
-#=head2 _process_features
-#
-# Title   : _process_features
-# Usage   : $self->_process_features($seqdata)
-# Function: Process feature data chunk into usable bits
-# Returns : 
-# Args    : data chunk
-#
-#=cut
-
-sub _process_features {
-    my ($self, $seqdata) = @_;
-    my @ftlines = split m{\n}, $seqdata->{DATA};
-    delete $seqdata->{DATA};
-    # don't deal with balancing quotes for now; just get rid of them...
-    # Should we worry about checking whether these are balanced
-    # for round-tripping tests?
-    map { s{"}{}g } @ftlines;
-    # all sfs start with the location...
-    my $qual = 'LOCATION';
-    my $ct = 0;
-    for my $qualdata (@ftlines) {
-        if ($qualdata =~ m{^/([^=]+)=?(.+)?}) {
-            ($qual, $qualdata) = ($1, $2);
-            $qualdata ||= ''; # for those qualifiers that have no data, like 'pseudo'
-            $ct = (exists $seqdata->{$qual}) ? 
-                  ((ref($seqdata->{$qual}))  ? scalar(@{ $seqdata->{$qual} }) : 1)
-                  : 0 ;
-        }
-        my $delim = ($qual eq 'translation' || exists $FTQUAL_NO_QUOTE{$qual}) ?
-            '' : ' ';
-        # if more than one, turn into an array ref and append
-        if ($ct == 0) {
-            (exists $seqdata->{$qual}) ? ($seqdata->{$qual}.= $delim.$qualdata || '') :
-                                         ($seqdata->{$qual} .= $qualdata || '');            
-        } else {
-            if (!ref($seqdata->{$qual})) {
-                $seqdata->{$qual} = [$seqdata->{$qual}];
-            }
-            (exists $seqdata->{$qual}->[$ct]) ? (($seqdata->{$qual}->[$ct]) .= $delim.$qualdata) :
-                                             (($seqdata->{$qual}->[$ct]) .= $qualdata);
-        }
-    }
-}
+use base qw(Bio::Stream::IO);
 
 1;
 
