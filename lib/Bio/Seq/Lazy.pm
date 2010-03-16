@@ -11,7 +11,7 @@ sub stream {
     return unless $type;
     if ($stream) {
         $self->throw("Stream must be a Bio::Stream::GenericStreamI") unless ref $stream && $stream->isa('Bio::Stream::GenericStreamI');
-        $self->{stream}->{$type} = $stream;
+        push @{$self->{stream}->{$type}}, $stream;
     }
     $self->{stream}->{$type}
 }

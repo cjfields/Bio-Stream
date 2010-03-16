@@ -4,14 +4,18 @@ use strict;
 use warnings;
 use base qw(Bio::Root::IO Bio::Stream::GenericStreamI);
 
+# TODO: deal with non-seekable streams; do we really care to implement support
+# for these (it would be just as easy to push data into a tempfile and run from
+# it, though I hate the approach)
+
 sub new {
     my ($caller, @args) = @_;
     # this should only call Bio::Root::Root::new()
     my $self = Bio::Root::Root::new($caller, @args);
     
-    my $io = $self->_rearrange([qw[STREAM]], @args);
+    my ($io, $markers, $methods) = $self->_rearrange([qw[STREAM MARKERS METHODS]], @args);
     if ($io) {
-        $self->_init_from_stream($io)
+        $self->_init_from_stream($io, $markers, $methods)
     } else {
         $self->_initialize_io(@args);
         $self->_set_markers(qw(start current));
@@ -21,8 +25,22 @@ sub new {
     return $self;
 }
 
+sub next_dataset {
+    return $_[0]->{next_dataset}->($_[0]);
+}
+
+sub pull_dataset {
+    shift->throw_not_implemented;
+}
+
+sub reset_stream {
+    my $self = shift;
+    CORE::seek($self->_fh, $self->tell('start'), 0);
+    1;
+}
+
 sub _init_from_stream {
-    my ($self, $io) = @_;
+    my ($self, $io, $markers, $methods) = @_;
     if ($io && ref $io) {
         $self->throw("Must use a Bio::Root::IO")
             unless $io->isa('Bio::Root::IO');
@@ -30,9 +48,24 @@ sub _init_from_stream {
         # this is pretty naive ATM, should change to be more generic
         my $fh = $io->_fh;
         $self->_initialize_io(-fh => $io->_fh);
-        $self->_set_markers(qw(start current));
+        if ($markers && ref $markers eq 'HASH') {
+            for my $key (keys %$markers) {
+                $self->_set_marker_pos($key, $markers->{$key});
+            }
+        } else {
+            # implicitly set markers to wherever the file marker is now...
+            $self->_set_markers(qw(start current));
+        }
+        if ($methods && ref $methods eq 'HASH') {
+            
+            #only two methods are allowed, next_dataset && pull_dataset
+            for my $sub (qw(next_dataset pull_dataset)) {
+                next if !exists $methods->{$sub} || ref($methods->{$sub}) ne 'CODE';
+                $self->{$sub} = $methods->{$sub};
+            }
+        }
         # carry over any buffers
-        $self->_buffer($io->_buffer) if $io->_buffer;
+        $self->_buffer($io->{_readbuffer});
         $self->parent_stream($io);
     } else {
         $self->throw("_init_from_io() requires a Bio::Root::IO");
@@ -47,12 +80,14 @@ sub _buffer {
     return $self->{_readbuffer}
 }
 
+# TODO: rename as pos(), as this isn't the same as tell(), so confusing
 sub tell {
     my ($self, $type) = @_;
     return unless $type;
     $self->{_pos}->{$type};
 }
 
+# TODO: rename to something non-CORE (stream_seek maybe)
 sub seek {
     my ($self, $type) = @_;
     return unless $type;
@@ -78,11 +113,20 @@ sub _set_marker_pos {
 sub _readline {
     my $self = shift;
     my ($current, $end) = ($self->tell('current'), $self->tell('end'));
-    return if defined $end && $current > $end; # end of the stream
+    return if defined $end && $current >= $end; # end of the stream
     $self->seek('current') if CORE::tell($self->_fh) != $current;
     my $line = $self->SUPER::_readline(@_);
     $self->_set_markers('current');
     $line;
+}
+
+sub _read_from_start {
+    my $self = shift;
+    my ($start, $end, $fh) = ($self->tell('start'), $self->tell('end'), $self->_fh);
+    CORE::seek($fh,$start, 0);
+    my $chunk; 
+    read($fh, $chunk, $end - $start);
+    $chunk;
 }
 
 sub parent_stream {
@@ -100,6 +144,7 @@ sub spawn_stream {
     $spawn;
 }
 
+# need to do a little more investigation into ensuring this works as advertised...
 sub DESTROY {
     my $self = shift;
     # if in parent stream...

@@ -7,63 +7,19 @@ use strict;
 use Bio::Annotation::TypeManager;
 use Bio::Annotation::SimpleValue;
 
-use base qw(Bio::Root::Root
-Bio::AnnotationCollectionI
-Bio::AnnotationI
-Bio::Stream::CollectionI
-Bio::Stream::GenericStreamI);
+use base qw(Bio::Stream::Collection Bio::AnnotationCollectionI Bio::AnnotationI);
 
 sub new{
    my ($class,@args) = @_;
    
    my $self = $class->SUPER::new(@args);
    
-   #my ($handler) = $self->_rearrange([qw(HANDLER)], @args);
+   my ($handler) = $self->_rearrange([qw(HANDLER)], @args);
    
    #$self->{'_annotation'} = {};
    #$self->_typemap(Bio::Annotation::TypeManager->new());
    #
    #return $self;
-}
-
-sub add_stream {
-    my ($self, $stream) = @_;
-    return unless $stream;
-    $self->throw('Must implement Bio::Stream::GenericStreamI') unless $stream->isa('Bio::Stream::GenericStreamI');
-    push @{$self->{streams}}, $stream;
-    1;
-}
-
-sub remove_streams {
-    my ($self) = @_;
-    my $streams = $self->{streams};
-    $self->{streams} = [];
-    $streams;
-}
-
-sub next_dataset {
-    my $self = shift;
-    my $ds;
-    for my $stream (@{$self->{streams}}) {
-        $ds = $stream->next_dataset;
-        next unless defined $ds;
-    }
-    $ds;
-}
-
-sub reset_stream {
-    my $self = shift;
-    for my $stream (@{$self->{streams}}) {
-        $ds = $stream->next_dataset;
-        next unless defined $ds;
-    }
-}
-
-# alias
-*reset_streams = \&reset_stream;
-
-sub pull_dataset {
-    
 }
 
 sub get_all_annotation_keys{

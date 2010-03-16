@@ -4,21 +4,13 @@ use strict;
 use warnings;
 use base qw(Bio::Event::EventGeneratorI);
 
-sub _init_from_io { shift->throw_not_implemented; }
+sub _init_from_stream { shift->throw_not_implemented; }
 
 sub next_dataset { shift->throw_not_implemented; }
 
-sub stream_status { shift->throw_not_implemented; }
+sub pull_dataset { shift->throw_not_implemented; }
 
-sub stream_type { shift->throw_not_implemented; }
-
-sub stream_start { shift->throw_not_implemented; }
-
-sub stream_pos { shift->throw_not_implemented; }
-
-sub advance { shift->throw_not_implemented; }
-
-sub auto_advance { shift->throw_not_implemented; }
+sub reset_stream { shift->throw_not_implemented; }
 
 1;
 

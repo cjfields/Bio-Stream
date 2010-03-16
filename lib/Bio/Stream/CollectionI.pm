@@ -9,8 +9,6 @@ sub add_stream { shift->throw_not_implemented }
 
 sub remove_stream { shift->throw_not_implemented }
 
-sub registered_streams { shift->throw_not_implemented }
-
 1;
 
 __END__

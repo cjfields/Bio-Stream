@@ -3,6 +3,7 @@ use strict;
 use warnings;
 use Data::Dumper;
 use Bio::Seq::Lazy;
+use Bio::Stream::IO;
 #use Bio::SeqIO::Handler::GenericRichSeqHandler;
 #use Bio::Seq::SeqFactory;
 
@@ -37,19 +38,10 @@ sub _initialize {
     my($self,@args) = @_;
 
     $self->SUPER::_initialize(@args);
-    
-    #my $handler = $self->_rearrange([qw(HANDLER)],@args);
-    # hash for functions for decoding keys.
-    #$handler ? $self->seqhandler($handler) :
-    #$self->seqhandler(Bio::SeqIO::Handler::LazyHandler->new(
-    #                -format => 'genbank',
-    #                -verbose => $self->verbose,
-    #                -builder => $self->sequence_builder
-    #                ));
     #if( ! defined $self->sequence_factory ) {
     #    $self->sequence_factory(Bio::Seq::SeqFactory->new
     #            (-verbose => $self->verbose(),
-    #             -type => 'Bio::Seq::RichSeq'));
+    #             -type => 'Bio::Seq::Lazy'));
     #}
 }
 
@@ -67,22 +59,146 @@ sub _initialize {
 # but the parser seems to hold up nicely so far...
 
 my %STREAM_START = (
-    LOCUS       => 'annotation',
     FEATURES    => 'features',
+    BASE        => 'sequence',
     ORIGIN      => 'sequence',
     '//'        => 'end'
 );
 
-my %STREAM_PARSER = (
+# these are the things we don't really care about
+
+# TODO: NYI
+my %STREAM_SKIP = map {$_ => 1} qw(BASE);
+
+# these are installed as next_dataset() in any child stream instances, so ess.
+# $stream == $self; iterates through the stream, returns a processed hashref
+my %STREAM_ITERATOR = (
     'annotation'    => sub {
+        # for consistency btwn formats we might want to map these to something
+        # consistent
         my $stream = shift;
-        my $data;
+        my ($data, $seen, $current);
+        # in this implementation, this groups the annotations together into
+        # related chunks, as designated by the genbank file
         while (my $line = $stream->_readline) {
-            if ($line =~ /^(\s{0,3})(\w+)\s+(.*)$}/ox) {
-                
+            if ($line =~ m{^(\s{0,3})(\w+)\s+([^\n]+)$}xmso) {
+                my $is_primary = !length($1);
+                if ($is_primary && $seen) {
+                    $stream->_pushback($line);
+                    last;
+                }
+                $current = $2;
+                if ($is_primary) {
+                    $data->{TYPE} = $current;
+                    $seen ++;
+                }
+                $data->{DATA}->{$current} = $3;
+            } else {
+                if (!$data->{TYPE}) {
+                    $stream->throw("No annotation type found: $line")
+                }
+                chomp $line;
+                $line =~ s{^\s+}{};
+                $data->{DATA}->{$current} .=
+                    $data->{DATA}->{$current} && $data->{DATA}->{$current}  =~ /-$/ ? 
+                    $line : ' '.$line;
             }
         }
+        $data;
     },
+    'features'      => sub {
+        my $stream = shift;
+        my ($data, $primary_key);
+        my ($qual);
+        my %current_qual;
+        while (my $line = $stream->_readline) {
+            next if $line =~ /^FEATURES/;
+            $line =~ s{"}{}g;
+            my $qualdata;
+            my $ct;
+            if ($line =~ m{^\s{3,5}(\w+)\s+([^\n]+)$}xmso) {
+                if ($primary_key) {
+                    $stream->_pushback($line);
+                    last;
+                }
+                $primary_key = $1;
+                $data->{TYPE} = 'FEATURE';
+                $data->{DATA}->{PRIMARY_KEY} = $primary_key;
+                ($qual, $qualdata) = ('LOCATION', $2);
+                $current_qual{$qual} = 0;
+            } elsif ($line =~ m{^\s+/([^=]+)=?([^\n]+)?}xmso ) {
+                ($qual, $qualdata) = ($1, $2);
+                $qualdata ||= '';
+                $current_qual{$qual} = exists $current_qual{$qual} ? $current_qual{$qual}++ : 0;
+                $qualdata ||= ''; # for those qualifiers that have no data, like 'pseudo'
+            } else {
+                chomp $line;
+                $line =~ s{^\s+}{};
+                $qualdata = $line;
+            }
+            $stream->throw("No qualifier or primary key: $line") unless $primary_key && $qual;
+            my $delim = ($qual eq 'translation' || exists $FTQUAL_NO_QUOTE{$qual}) ?
+                '' : ' ';
+            (exists $data->{DATA}->{$qual}->[$current_qual{$qual}]) ?
+                (($data->{DATA}->{$qual}->[$current_qual{$qual}]) .= $delim.$qualdata) :
+                (($data->{DATA}->{$qual}->[$current_qual{$qual}]) .= $qualdata);
+        }
+        $data;
+    },
+    'sequence'      => sub {
+        my $stream = shift;
+        my $data;
+        my $seq;
+        while (my $line = $stream->_readline) {
+            next if $line =~ /^(?:BASE|ORIGIN)/; 
+            $line =~ tr/A-Za-z//cd  ;
+            $seq .= $line;
+        }
+        @{$data}{qw(TYPE DATA)} = ('SEQUENCE', $seq) if $seq;
+        $data;
+    },
+);
+
+# These are installed as pull_dataset() in the child streams, so $stream ==
+# $self may just have these be defined StreamIO subclasses. This works
+# generically for now
+
+# NYI
+my %STREAM_PULL = (
+    
+    # to keep in lines with the implementation above, this pulls out only
+    # the annotation passed, creates the hash ref, then passes it back.
+    #'annotation'    => sub {
+    #    my ($stream, $name) = @_;
+    #    my ($data, $seen, $current);
+    #    # in this implementation, this groups the annotations together into
+    #    # related chunks, as designated by the genbank file
+    #    #while (my $line = $stream->_readline) {
+    #    #    if ($line =~ m{^(\s{0,3})(\w+)\s+([^\n]+)$}xmso) {
+    #    #        my $is_primary = !length($1);
+    #    #        if ($is_primary && $seen) {
+    #    #            $stream->_pushback($line);
+    #    #            last;
+    #    #        }
+    #    #        $current = $2;
+    #    #        if ($is_primary) {
+    #    #            $data->{TYPE} = $current;
+    #    #            $seen ++;
+    #    #        }
+    #    #        $data->{DATA}->{$current} = $3;
+    #    #    } else {
+    #    #        if (!$data->{TYPE}) {
+    #    #            $stream->throw("No annotation type found: $line")
+    #    #        }
+    #    #        chomp $line;
+    #    #        $line =~ s{^\s+}{};
+    #    #        $data->{DATA}->{$current} .=
+    #    #            $data->{DATA}->{$current} && $data->{DATA}->{$current}  =~ /-$/ ? 
+    #    #            $line : ' '.$line;
+    #    #    }
+    #    #}
+    #    $data;
+    #}
 );
 
 # these are the stream-specific subs that pull out data into discrete bits
@@ -93,13 +209,12 @@ sub next_seq {
     local($/) = "\n";
     my $seenlocus;
     my $seq;
-    my $stream;
-    my $prior_stream;
+    my $stream = my $prior_stream = '';
     my $fh = $self->_fh;
     PARSER:
     while (defined(my $line = $self->_readline)) {
         next if $line =~ m{^\s*$};
-        if ($line =~ m{^(LOCUS|FEATURES|ORIGIN|//)\s+}ox) {
+        if ($line =~ m{^([A-Z]+|//)\s+}ox) {
             my $ann = $1;
             unless ($seenlocus) {
                 $self->throw("No LOCUS found.  Not GenBank in my book!")
@@ -107,31 +222,39 @@ sub next_seq {
                 $seenlocus = 1;
             }
             $seq ||= Bio::Seq::Lazy->new();
-            $stream = $STREAM_START{$ann};
+            $stream = exists $STREAM_START{$ann} ? $STREAM_START{$ann} : 'annotation';
         } else {
             next;
         }
         $self->throw("Stream type not defined") if !defined $stream;
 
-        #local $/ = $mode eq 'sequence' ? "\n//" : "\n";
+        # fiddling with the record sep. during the loop, not sure if this is
+        # safe, but it sort of makes sense to speed things up...
         
-        # if we get here, we start a new stream based on the mode
+        #local $/ = $stream eq 'sequence' ? "\n//" : "\n";
+        
+        # if we get here, we start a new stream based on the mode.
         # trick here is, do we want to hand this off to the handler, or
         # do within the sequence object?  For now just pass in the streams to
         # the sequence object, work it out from there
-        if ($stream ne 'end') {
-            my $pos = tell($fh) - length($line);
-            $seq->stream($stream,
-                         $self->spawn_stream('start' => $pos,
-                                             'current' => $pos));
-            $seq->stream($prior_stream)->_set_marker_pos('end', $pos) if $prior_stream;
-        } else {
-            last PARSER;
+        my $pos = tell($fh) - length($line);
+        if ($stream ne $prior_stream) {
+            # in this case, we just want to create a new stream using this one
+            # as the parent, mainly to maintain a consistent interface
+            $seq->stream($stream, Bio::Stream::IO->new(
+                -stream     => $self,
+                -markers    => {'start' => $pos, 'current' => $pos},
+                -methods    => {
+                                'next_dataset' => $STREAM_ITERATOR{$stream},
+                                #'pull_dataset' => $STREAM_PULL{$stream}
+                                }
+                )) if $stream ne 'end';
+            my $p = $seq->stream($prior_stream);
+            $seq->stream($prior_stream)->[-1]->_set_marker_pos('end', $pos) if $prior_stream;
         }
+        last PARSER if $stream eq 'end';
         $prior_stream = $stream;
     }
-    # fencepost
-    $seq->stream($prior_stream)->_set_marker_pos('end', tell($fh)) if $seq;
     return $seq;
 }
 
@@ -149,10 +272,6 @@ sub write_seq {
     shift->throw("Use Bio::SeqIO::genbank for output");
     # maybe make a Writer class as well????
 }
-
-package Bio::SeqIO::gbstream::annotation;
-
-use base qw(Bio::Stream::IO);
 
 1;
 
