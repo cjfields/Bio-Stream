@@ -1,13 +1,12 @@
 package Bio::SeqIO::gbstream;
 use strict;
 use warnings;
+use base qw(Bio::Stream::IO Bio::SeqIO);
+
 use Data::Dumper;
 use Bio::Seq::Lazy;
 use Bio::Stream::IO;
-#use Bio::SeqIO::Handler::GenericRichSeqHandler;
-#use Bio::Seq::SeqFactory;
 
-use base qw(Bio::Stream::IO Bio::SeqIO);
 
 # map all annotation keys to consistent INSDC-based tags for all handlers
 
@@ -60,18 +59,19 @@ sub _initialize {
 
 my %STREAM_START = (
     FEATURES    => 'features',
-    BASE        => 'sequence',
     ORIGIN      => 'sequence',
     '//'        => 'end'
 );
 
 # these are the things we don't really care about
 
-# TODO: NYI
 my %STREAM_SKIP = map {$_ => 1} qw(BASE);
 
-# these are installed as next_dataset() in any child stream instances, so ess.
-# $stream == $self; iterates through the stream, returns a processed hashref
+# About to start testing recursive mapping, basically do a loose mapping
+# initially (performed in this module), then a fine mapping as needed, then into
+# hashes/objects. Must implement 1-2 new interface methods that map either
+# partially or completely
+
 my %STREAM_ITERATOR = (
     'annotation'    => sub {
         # for consistency btwn formats we might want to map these to something
@@ -151,7 +151,7 @@ my %STREAM_ITERATOR = (
         my $seq;
         while (my $line = $stream->_readline) {
             next if $line =~ /^(?:BASE|ORIGIN)/; 
-            $line =~ tr/A-Za-z//cd  ;
+            $line =~ tr/A-Za-z//cd;
             $seq .= $line;
         }
         @{$data}{qw(TYPE DATA)} = ('SEQUENCE', $seq) if $seq;
@@ -163,46 +163,18 @@ my %STREAM_ITERATOR = (
 # $self may just have these be defined StreamIO subclasses. This works
 # generically for now
 
-# NYI
-my %STREAM_PULL = (
-    
-    # to keep in lines with the implementation above, this pulls out only
-    # the annotation passed, creates the hash ref, then passes it back.
-    #'annotation'    => sub {
-    #    my ($stream, $name) = @_;
-    #    my ($data, $seen, $current);
-    #    # in this implementation, this groups the annotations together into
-    #    # related chunks, as designated by the genbank file
-    #    #while (my $line = $stream->_readline) {
-    #    #    if ($line =~ m{^(\s{0,3})(\w+)\s+([^\n]+)$}xmso) {
-    #    #        my $is_primary = !length($1);
-    #    #        if ($is_primary && $seen) {
-    #    #            $stream->_pushback($line);
-    #    #            last;
-    #    #        }
-    #    #        $current = $2;
-    #    #        if ($is_primary) {
-    #    #            $data->{TYPE} = $current;
-    #    #            $seen ++;
-    #    #        }
-    #    #        $data->{DATA}->{$current} = $3;
-    #    #    } else {
-    #    #        if (!$data->{TYPE}) {
-    #    #            $stream->throw("No annotation type found: $line")
-    #    #        }
-    #    #        chomp $line;
-    #    #        $line =~ s{^\s+}{};
-    #    #        $data->{DATA}->{$current} .=
-    #    #            $data->{DATA}->{$current} && $data->{DATA}->{$current}  =~ /-$/ ? 
-    #    #            $line : ' '.$line;
-    #    #    }
-    #    #}
-    #    $data;
-    #}
+my %ANNOTATION_MAP = (
+    reference       => 'REFERENCE',
+    species         => 'SOURCE',
+    keyword         => 'KEYWORD',
 );
 
-# these are the stream-specific subs that pull out data into discrete bits
-# and 
+# TODO: NYI; this could feasibly replace the iterator interface above
+my %STREAM_PULL = (
+    # to keep in lines with the implementation above, this pulls out only
+    # the annotation passed, creates one or more hash refs, then passes them back.
+    # pulls are nondestructive
+);
 
 sub next_seq {
     my $self = shift;
@@ -216,6 +188,7 @@ sub next_seq {
         next if $line =~ m{^\s*$};
         if ($line =~ m{^([A-Z]+|//)\s+}ox) {
             my $ann = $1;
+            next if ($STREAM_SKIP{$ann});
             unless ($seenlocus) {
                 $self->throw("No LOCUS found.  Not GenBank in my book!")
                     if ($ann ne 'LOCUS');
@@ -270,7 +243,7 @@ sub next_seq {
 
 sub write_seq {
     shift->throw("Use Bio::SeqIO::genbank for output");
-    # maybe make a Writer class as well????
+    # maybe make a Wraiter class as well????
 }
 
 1;

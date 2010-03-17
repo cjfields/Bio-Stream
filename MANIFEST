@@ -1,14 +1,16 @@
 Build.PL
 Changes
 ignore.txt
+lib/Bio/Annotation/LazyCollection.pm
+lib/Bio/Handler/AnnotationHandler.pm
 lib/Bio/Seq/Lazy.pm
 lib/Bio/SeqIO/gbstream.pm
 lib/Bio/Stream.pm
-lib/Bio/Stream/Annotation.pm
+lib/Bio/Stream/Collection.pm
 lib/Bio/Stream/CollectionI.pm
 lib/Bio/Stream/GenericStreamI.pm
 lib/Bio/Stream/IO.pm
-MANIFEST			This list of files
+MANIFEST
 MANIFEST.SKIP
 README
 t/boilerplate.t

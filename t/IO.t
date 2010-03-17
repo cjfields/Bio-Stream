@@ -20,27 +20,27 @@ use Bio::Root::IO;
     my $stream = Bio::Stream::IO->new(-file => test_input_file('AnnIX-v003.gbk'));
     
     # file markers
-    is($stream->tell('start'), 0);
-    is($stream->tell('current'), 0);
+    is($stream->pos('start'), 0);
+    is($stream->pos('current'), 0);
 
     $line = $stream->_readline;
     like($line, qr/^LOCUS/);
     
     # current marker should move
-    cmp_ok($stream->tell('current'), '>', 0);
+    cmp_ok($stream->pos('current'), '>', 0);
 }
 
 # passing IO from one stream to another, each stream maintaining a file pointer
 {
     my $str1 = Bio::Stream::IO->new(-file => test_input_file('AnnIX-v003.gbk'));
     
-    is($str1->tell('start'), 0, 'at beginning');
+    is($str1->pos('start'), 0, 'at beginning');
     
     my $line = $str1->_readline;
     like($line, qr/^LOCUS/);
     
     my $str2 = $str1->spawn_stream();
-    is($str2->tell('start'), $str1->tell('current'), 'new stream starts where last stream left off');
+    is($str2->pos('start'), $str1->pos('current'), 'new stream starts where last stream left off');
 
     $line = $str2->_readline;
     like($line, qr/^DEFINITION/);

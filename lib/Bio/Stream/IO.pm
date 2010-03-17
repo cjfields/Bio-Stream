@@ -30,12 +30,12 @@ sub next_dataset {
 }
 
 sub pull_dataset {
-    shift->throw_not_implemented;
+    return $_[0]->{pull_dataset}->($_[0]);
 }
 
 sub reset_stream {
     my $self = shift;
-    CORE::seek($self->_fh, $self->tell('start'), 0);
+    CORE::seek($self->_fh, $self->pos('start'), 0);
     1;
 }
 
@@ -45,7 +45,7 @@ sub _init_from_stream {
         $self->throw("Must use a Bio::Root::IO")
             unless $io->isa('Bio::Root::IO');
         
-        # this is pretty naive ATM, should change to be more generic
+        # this is pretty naive ATM, change to be more generic?
         my $fh = $io->_fh;
         $self->_initialize_io(-fh => $io->_fh);
         if ($markers && ref $markers eq 'HASH') {
@@ -80,18 +80,16 @@ sub _buffer {
     return $self->{_readbuffer}
 }
 
-# TODO: rename as pos(), as this isn't the same as tell(), so confusing
-sub tell {
+sub pos {
     my ($self, $type) = @_;
     return unless $type;
     $self->{_pos}->{$type};
 }
 
-# TODO: rename to something non-CORE (stream_seek maybe)
-sub seek {
+sub stream_seek {
     my ($self, $type) = @_;
     return unless $type;
-    CORE::seek($self->_fh, $self->tell($type), 0);
+    CORE::seek($self->_fh, $self->pos($type), 0);
 }
 
 sub _set_markers {
@@ -112,17 +110,28 @@ sub _set_marker_pos {
 
 sub _readline {
     my $self = shift;
-    my ($current, $end) = ($self->tell('current'), $self->tell('end'));
+    my ($current, $end) = ($self->pos('current'), $self->pos('end'));
     return if defined $end && $current >= $end; # end of the stream
-    $self->seek('current') if CORE::tell($self->_fh) != $current;
+    $self->stream_seek('current') if CORE::tell($self->_fh) != $current;
     my $line = $self->SUPER::_readline(@_);
     $self->_set_markers('current');
     $line;
 }
 
+sub read_from_pos {
+    my ($self, $type) = @_;
+    my ($start, $end, $fh) = ($self->pos($type), $self->pos('end'), $self->_fh);
+    # TODO: should default end to be EOF
+    return unless $start && $end;
+    CORE::seek($fh,$start, 0);
+    my $chunk; 
+    read($fh, $chunk, $end - $start);
+    $chunk;
+}
+
 sub _read_from_start {
     my $self = shift;
-    my ($start, $end, $fh) = ($self->tell('start'), $self->tell('end'), $self->_fh);
+    my ($start, $end, $fh) = ($self->pos('start'), $self->pos('end'), $self->_fh);
     CORE::seek($fh,$start, 0);
     my $chunk; 
     read($fh, $chunk, $end - $start);

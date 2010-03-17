@@ -4,9 +4,7 @@ use strict;
 
 # Object preamble - inherits from Bio::Root::Root
 
-use base qw(Bio::Root::Root
-Bio::Stream::CollectionI
-Bio::Stream::GenericStreamI);
+use base qw(Bio::Root::Root Bio::Stream::CollectionI Bio::Stream::GenericStreamI);
 
 sub add_stream {
     my ($self, $stream) = @_;
